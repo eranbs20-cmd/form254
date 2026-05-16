@@ -14,6 +14,7 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -114,10 +115,12 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
       <input type="file" id="scan-file" accept="image/*,.pdf,.docx,.doc,.txt,.rtf" style="display:none" onchange="doScan()">
       <div style="font-size:10.5px;color:#999;margin:1px 0 5px">תמונה · PDF · Word · טקסט</div>
       <button class="btn-g" id="btn-scan" onclick="document.getElementById('scan-file').click()">העלה מסמך וחלץ נתונים</button>
+      <button class="btn-g" style="background:#6c3fc5;margin-top:4px" onclick="extractWithAI()">✨ חלץ עם Claude AI</button>
     </div>
     <div id="tab-paste" style="display:none">
       <textarea id="paste-area" placeholder="הדבק כאן טקסט חופשי — ממייל, Word, תעודת זהות...&#10;שם, ת.ז, טלפון, כתובת ומייל יחולצו אוטומטית."></textarea>
       <button class="btn-g" onclick="doPaste()">חלץ נתונים</button>
+      <button class="btn-g" style="background:#6c3fc5;margin-top:4px" onclick="extractWithAI()">✨ חלץ עם Claude AI</button>
     </div>
     <div class="stat" id="scan-stat"></div>
   </div>
@@ -192,6 +195,12 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
     בתיבת ההדפסה: בחר <strong>שמור כ-PDF</strong> ובטל כותרות עמוד
   </div>
   <div class="stat" id="pdf-stat"></div>
+  <div class="sh" style="cursor:pointer;margin-top:8px" onclick="var n=this.nextElementSibling;n.style.display=n.style.display?'':'block'">⚙ Claude AI — הגדרות מפתח</div>
+  <div class="fg" style="display:none">
+    <label>מפתח Claude API (נשמר במכשיר בלבד)</label>
+    <input type="password" id="ai-key" placeholder="sk-ant-api03-..." oninput="localStorage.setItem('ck',this.value)">
+    <div style="font-size:10px;color:#888;margin-top:2px">המפתח נשמר רק במכשירך ולא נשלח לאף שרת חיצוני</div>
+  </div>
 </div>
 
 <div class="pp">
@@ -279,46 +288,21 @@ async function exportPDF(){
   const s=$('pdf-stat');
   s.className='stat';s.textContent='מייצר PDF...';
   try{
-    const SCALE=2,W=794,H=1123;
-    const cv=document.createElement('canvas');
-    cv.width=W*SCALE;cv.height=H*SCALE;
-    const ctx=cv.getContext('2d');
-    ctx.scale(SCALE,SCALE);
-    ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
-    // Draw background form image (always in DOM even when .pp is hidden)
-    const bgImg=$('pdf-bg');
-    await new Promise(res=>{if(bgImg.complete)res();else{bgImg.onload=res;bgImg.onerror=res;}});
-    ctx.drawImage(bgImg,0,0,W,H);
-    // Draw each text field at its exact position
-    document.querySelectorAll('#form-preview .fld').forEach(fld=>{
-      const txt=fld.value!==undefined?fld.value:fld.textContent;
-      if(!txt||!txt.trim())return;
-      const l=parseFloat(fld.style.left)||0;
-      const t=parseFloat(fld.style.top)||0;
-      const w=parseFloat(fld.style.width)||200;
-      const h=parseFloat(fld.style.height)||20;
-      let fs=14.67;
-      if(fld.style.fontSize){
-        const fsr=fld.style.fontSize;
-        fs=fsr.includes('pt')?parseFloat(fsr)*96/72:parseFloat(fsr);
-      }
-      const bold=fld.style.fontWeight==='bold'||fld.classList.contains('fld-bold');
-      ctx.font=(bold?'bold ':'')+fs+'px "Frank Ruhl Libre",serif';
-      ctx.direction='rtl';ctx.textAlign='right';ctx.textBaseline='middle';
-      ctx.save();ctx.beginPath();ctx.rect(l,t,w,h);ctx.clip();
-      ctx.fillStyle='#fff';ctx.fillRect(l,t,w,h);
-      ctx.fillStyle='#000';
-      // For checkboxes just draw a checkmark
-      if(fld.type==='checkbox'){
-        if(fld.checked){ctx.textAlign='center';ctx.fillText('✓',l+w/2,t+h/2);}
-      } else {
-        ctx.fillText(txt.trim(),l+w-2,t+h/2);
-      }
-      ctx.restore();
-    });
+    const pp=document.querySelector('.pp');
+    const fp=$('form-preview');
+    const savedZoom=fp.style.zoom;
+    const ppHidden=getComputedStyle(pp).display==='none';
+    if(ppHidden){
+      pp.style.position='fixed';pp.style.top='-9999px';pp.style.left='0';pp.style.display='block';
+    }
+    fp.style.zoom='';
+    await new Promise(r=>setTimeout(r,80));
+    const canvas=await html2canvas(fp,{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#fff',width:794,height:1123,scrollX:0,scrollY:0});
+    fp.style.zoom=savedZoom;
+    if(ppHidden){pp.style.position='';pp.style.top='';pp.style.left='';pp.style.display='';}
     const {jsPDF}=window.jspdf;
     const pdf=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
-    pdf.addImage(cv.toDataURL('image/jpeg',0.97),'JPEG',0,0,210,297);
+    pdf.addImage(canvas.toDataURL('image/jpeg',0.97),'JPEG',0,0,210,297);
     pdf.save('form-254.pdf');
     s.className='stat ok';s.textContent='הקובץ נשמר ✓';
     setTimeout(()=>{s.textContent='';s.className='stat';},5000);
@@ -398,8 +382,8 @@ function applyParty(role,party){
   Object.entries(MAP).forEach(([k,f])=>{const el=$(pfx+f);if(el&&party[k]&&!el.readOnly)el.value=party[k];});sync();
 }
 function closeReview(){$('review-modal').style.display='none';}
-function doPaste(){const text=$('paste-area').value.trim();if(!text){showStat('scan-stat','אין טקסט','err');return;}const parties=extractMulti(text);if(!parties.length){showStat('scan-stat','לא זוהו פרטים — בדוק ידנית','');return;}showReview(parties);}
-let _ocr=null;
+function doPaste(){const text=$('paste-area').value.trim();if(!text){showStat('scan-stat','אין טקסט','err');return;}_lastScanText=text;const parties=extractMulti(text);if(!parties.length){showStat('scan-stat','לא זוהו פרטים — נסה חילוץ AI','');return;}showReview(parties);}
+let _ocr=null,_lastScanText='';
 async function getOCR(){if(_ocr)return _ocr;showStat('scan-stat','טוען מנוע זיהוי...');_ocr=await Tesseract.createWorker('heb',1,{logger:m=>{if(m.status==='recognizing text')showStat('scan-stat','מזהה... '+Math.round((m.progress||0)*100)+'%');}});return _ocr;}
 async function doScan(){
   const fi=$('scan-file');if(!fi.files.length)return;
@@ -409,10 +393,46 @@ async function doScan(){
     else if(name.endsWith('.docx')||name.endsWith('.doc'))text=await fromDocx(file);
     else if(file.type==='text/plain'||name.endsWith('.txt')||name.endsWith('.rtf'))text=await fromText(file);
     else text=await fromImage(file);
+    _lastScanText=text;
     const parties=extractMulti(text);
-    if(!parties.length)showStat('scan-stat','לא זוהו פרטים — בדוק ידנית','');else showReview(parties);
+    if(!parties.length)showStat('scan-stat','לא זוהו פרטים — נסה חילוץ AI','');else showReview(parties);
   }catch(e){showStat('scan-stat','שגיאה: '+e.message,'err');_ocr=null;}
   finally{btn.disabled=false;fi.value='';}
+}
+async function extractWithAI(){
+  const key=(localStorage.getItem('ck')||'').trim()||($('ai-key')&&$('ai-key').value.trim())||'';
+  if(!key){
+    const k=prompt('הכנס מפתח Claude API (sk-ant-...):');
+    if(!k)return;
+    localStorage.setItem('ck',k.trim());
+    if($('ai-key'))$('ai-key').value=k.trim();
+  }
+  const finalKey=localStorage.getItem('ck')||'';
+  const text=$('paste-area').value.trim()||_lastScanText;
+  if(!text){showStat('scan-stat','הדבק טקסט או העלה מסמך תחילה','err');return;}
+  showStat('scan-stat','שולח ל-Claude AI...');
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'x-api-key':finalKey,
+        'anthropic-version':'2023-06-01',
+        'content-type':'application/json',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:700,
+        messages:[{role:'user',content:`אתה עוזר משפטי. חלץ את פרטי הצדדים מהטקסט הבא של בקשה לישוב סכסוך ישראלית.\nהחזר JSON בלבד, ללא שום טקסט נוסף, בפורמט הבא:\n{"petitioner":{"name":"","id":"","address":"","phone":"","fax":"","email":""},"respondent":{"name":"","id":"","address":"","phone":"","fax":"","email":""}}\n\nטקסט:\n${text.slice(0,3000)}`}]
+      })
+    });
+    if(!res.ok){const e=await res.text();throw new Error('שגיאת API '+res.status+': '+e.slice(0,120));}
+    const d=await res.json();
+    const raw=d.content[0].text.replace(/```json|```/g,'').trim();
+    const p=JSON.parse(raw);
+    const mk=(o,r)=>({name:'',id:'',address:'',phone:'',fax:'',email:'',...o,_role:r});
+    showReview([mk(p.petitioner||{},'p'),mk(p.respondent||{},'r')]);
+  }catch(e){showStat('scan-stat','שגיאת AI: '+e.message,'err');}
 }
 async function fromPDF(file){
   pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
