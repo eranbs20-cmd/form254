@@ -115,12 +115,12 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
       <input type="file" id="scan-file" accept="image/*,.pdf,.docx,.doc,.txt,.rtf" style="display:none" onchange="doScan()">
       <div style="font-size:10.5px;color:#999;margin:1px 0 5px">תמונה · PDF · Word · טקסט</div>
       <button class="btn-g" id="btn-scan" onclick="document.getElementById('scan-file').click()">העלה מסמך וחלץ נתונים</button>
-      <button class="btn-g" style="background:#6c3fc5;margin-top:4px" onclick="extractWithAI()">✨ חלץ עם Claude AI</button>
+      <button class="btn-g" style="background:#6c3fc5;margin-top:4px" onclick="extractWithAI()">✨ חלץ עם Gemini AI</button>
     </div>
     <div id="tab-paste" style="display:none">
       <textarea id="paste-area" placeholder="הדבק כאן טקסט חופשי — ממייל, Word, תעודת זהות...&#10;שם, ת.ז, טלפון, כתובת ומייל יחולצו אוטומטית."></textarea>
       <button class="btn-g" onclick="doPaste()">חלץ נתונים</button>
-      <button class="btn-g" style="background:#6c3fc5;margin-top:4px" onclick="extractWithAI()">✨ חלץ עם Claude AI</button>
+      <button class="btn-g" style="background:#6c3fc5;margin-top:4px" onclick="extractWithAI()">✨ חלץ עם Gemini AI</button>
     </div>
     <div class="stat" id="scan-stat"></div>
   </div>
@@ -195,10 +195,10 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
     בתיבת ההדפסה: בחר <strong>שמור כ-PDF</strong> ובטל כותרות עמוד
   </div>
   <div class="stat" id="pdf-stat"></div>
-  <div class="sh" style="cursor:pointer;margin-top:8px" onclick="var n=this.nextElementSibling;n.style.display=n.style.display?'':'block'">⚙ Claude AI — הגדרות מפתח</div>
+  <div class="sh" style="cursor:pointer;margin-top:8px" onclick="var n=this.nextElementSibling;n.style.display=n.style.display?'':'block'">⚙ Gemini AI — הגדרות מפתח</div>
   <div class="fg" style="display:none">
-    <label>מפתח Claude API (נשמר במכשיר בלבד)</label>
-    <input type="password" id="ai-key" placeholder="sk-ant-api03-..." oninput="localStorage.setItem('ck',this.value)">
+    <label>מפתח Gemini API (נשמר במכשיר בלבד)</label>
+    <input type="password" id="ai-key" placeholder="AIza..." oninput="localStorage.setItem('gk',this.value)">
     <div style="font-size:10px;color:#888;margin-top:2px">המפתח נשמר רק במכשירך ולא נשלח לאף שרת חיצוני</div>
   </div>
 </div>
@@ -403,39 +403,52 @@ async function doScan(){
   finally{btn.disabled=false;fi.value='';}
 }
 async function extractWithAI(){
-  const key=(localStorage.getItem('ck')||'').trim()||($('ai-key')&&$('ai-key').value.trim())||'';
+  const key=(localStorage.getItem('gk')||'').trim()||($('ai-key')&&$('ai-key').value.trim())||'';
   if(!key){
-    const k=prompt('הכנס מפתח Claude API (sk-ant-...):');
+    const k=prompt('הכנס מפתח Gemini API (AIza...):');
     if(!k)return;
-    localStorage.setItem('ck',k.trim());
+    localStorage.setItem('gk',k.trim());
     if($('ai-key'))$('ai-key').value=k.trim();
   }
-  const finalKey=localStorage.getItem('ck')||'';
+  const finalKey=localStorage.getItem('gk')||'';
   const text=$('paste-area').value.trim()||_lastScanText;
   if(!text){showStat('scan-stat','הדבק טקסט או העלה מסמך תחילה','err');return;}
-  showStat('scan-stat','שולח ל-Claude AI...');
+  showStat('scan-stat','שולח ל-Gemini AI...');
+  const prompt=`# ROLE & TASK
+You are a Hebrew Legal Data Extraction Engine. Extract party information from an Israeli dispute resolution form text.
+
+# STRICT OUTPUT RULE
+Return ONLY a valid JSON object. No explanations, no markdown, no extra text.
+
+# JSON FORMAT
+{"petitioner":{"name":"","id":"","address":"","phone":"","fax":"","email":""},"respondent":{"name":"","id":"","address":"","phone":"","fax":"","email":""}}
+
+# FIELD RULES
+- name: Full Hebrew name only (no titles like עו"ד, no ID numbers)
+- id: Israeli ID number (9 digits, digits only)
+- address: Street + number + city (no apartment number)
+- phone: digits only, no dashes
+- fax: digits only, no dashes
+- email: lowercase email address
+
+# INPUT TEXT
+${text.slice(0,3000)}`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${finalKey}`,{
       method:'POST',
-      headers:{
-        'x-api-key':finalKey,
-        'anthropic-version':'2023-06-01',
-        'content-type':'application/json',
-        'anthropic-dangerous-direct-browser-access':'true'
-      },
+      headers:{'content-type':'application/json'},
       body:JSON.stringify({
-        model:'claude-haiku-4-5-20251001',
-        max_tokens:700,
-        messages:[{role:'user',content:`אתה עוזר משפטי. חלץ את פרטי הצדדים מהטקסט הבא של בקשה לישוב סכסוך ישראלית.\nהחזר JSON בלבד, ללא שום טקסט נוסף, בפורמט הבא:\n{"petitioner":{"name":"","id":"","address":"","phone":"","fax":"","email":""},"respondent":{"name":"","id":"","address":"","phone":"","fax":"","email":""}}\n\nטקסט:\n${text.slice(0,3000)}`}]
+        contents:[{parts:[{text:prompt}]}],
+        generationConfig:{temperature:0.1,maxOutputTokens:600}
       })
     });
-    if(!res.ok){const e=await res.text();throw new Error('שגיאת API '+res.status+': '+e.slice(0,120));}
+    if(!res.ok){const e=await res.text();throw new Error('שגיאת Gemini '+res.status+': '+e.slice(0,150));}
     const d=await res.json();
-    const raw=d.content[0].text.replace(/```json|```/g,'').trim();
+    const raw=(d.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/```json|```/g,'').trim();
     const p=JSON.parse(raw);
     const mk=(o,r)=>({name:'',id:'',address:'',phone:'',fax:'',email:'',...o,_role:r});
     showReview([mk(p.petitioner||{},'p'),mk(p.respondent||{},'r')]);
-  }catch(e){showStat('scan-stat','שגיאת AI: '+e.message,'err');}
+  }catch(e){showStat('scan-stat','שגיאת Gemini: '+e.message,'err');}
 }
 async function fromPDF(file){
   pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
