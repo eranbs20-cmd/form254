@@ -115,12 +115,12 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
       <input type="file" id="scan-file" accept="image/*,.pdf,.docx,.doc,.txt,.rtf" style="display:none" onchange="doScan()">
       <div style="font-size:10.5px;color:#999;margin:1px 0 5px">תמונה · PDF · Word · טקסט</div>
       <button class="btn-g" id="btn-scan" onclick="document.getElementById('scan-file').click()">העלה מסמך וחלץ נתונים</button>
-      <button class="btn-g" style="background:#6c3fc5;margin-top:4px" onclick="extractWithAI()">✨ חלץ עם Gemini AI</button>
+      <button class="btn-g" style="background:#6c3fc5;margin-top:4px" onclick="extractWithAI()">✨ חלץ עם Groq AI</button>
     </div>
     <div id="tab-paste" style="display:none">
       <textarea id="paste-area" placeholder="הדבק כאן טקסט חופשי — ממייל, Word, תעודת זהות...&#10;שם, ת.ז, טלפון, כתובת ומייל יחולצו אוטומטית."></textarea>
       <button class="btn-g" onclick="doPaste()">חלץ נתונים</button>
-      <button class="btn-g" style="background:#6c3fc5;margin-top:4px" onclick="extractWithAI()">✨ חלץ עם Gemini AI</button>
+      <button class="btn-g" style="background:#6c3fc5;margin-top:4px" onclick="extractWithAI()">✨ חלץ עם Groq AI</button>
     </div>
     <div class="stat" id="scan-stat"></div>
   </div>
@@ -195,10 +195,10 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
     בתיבת ההדפסה: בחר <strong>שמור כ-PDF</strong> ובטל כותרות עמוד
   </div>
   <div class="stat" id="pdf-stat"></div>
-  <div class="sh" style="margin-top:8px">⚙ Gemini AI — מפתח API</div>
+  <div class="sh" style="margin-top:8px">⚙ Groq AI — מפתח API (חינמי)</div>
   <div class="fg">
-    <label>מפתח Gemini API (נשמר במכשיר בלבד)</label>
-    <input type="password" id="ai-key" placeholder="AIza..." oninput="localStorage.setItem('gk',this.value)">
+    <label>מפתח Groq API — <a href="https://console.groq.com" target="_blank" style="color:#2563a8">console.groq.com</a> (חינמי)</label>
+    <input type="password" id="ai-key" placeholder="gsk_..." oninput="localStorage.setItem('grk',this.value)">
     <div style="font-size:10px;color:#888;margin-top:2px">המפתח נשמר רק במכשירך ולא נשלח לאף שרת חיצוני</div>
   </div>
 </div>
@@ -403,17 +403,17 @@ async function doScan(){
   finally{btn.disabled=false;fi.value='';}
 }
 async function extractWithAI(){
-  const key=(localStorage.getItem('gk')||'').trim()||($('ai-key')&&$('ai-key').value.trim())||'';
+  const key=(localStorage.getItem('grk')||'').trim()||($('ai-key')&&$('ai-key').value.trim())||'';
   if(!key){
-    const k=prompt('הכנס מפתח Gemini API (AIza...):');
+    const k=prompt('הכנס מפתח Groq API (gsk_...) — חינמי ב-console.groq.com:');
     if(!k)return;
-    localStorage.setItem('gk',k.trim());
+    localStorage.setItem('grk',k.trim());
     if($('ai-key'))$('ai-key').value=k.trim();
   }
-  const finalKey=localStorage.getItem('gk')||'';
+  const finalKey=localStorage.getItem('grk')||'';
   const text=$('paste-area').value.trim()||_lastScanText;
   if(!text){showStat('scan-stat','הדבק טקסט או העלה מסמך תחילה','err');return;}
-  showStat('scan-stat','שולח ל-Gemini AI...');
+  showStat('scan-stat','שולח ל-Groq AI...');
   const prompt=`# ROLE & TASK
 You are a Hebrew Legal Data Extraction Engine. Extract party information from an Israeli dispute resolution form text.
 
@@ -434,21 +434,18 @@ Return ONLY a valid JSON object. No explanations, no markdown, no extra text.
 # INPUT TEXT
 ${text.slice(0,3000)}`;
   try{
-    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${finalKey}`,{
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
       method:'POST',
-      headers:{'content-type':'application/json'},
-      body:JSON.stringify({
-        contents:[{parts:[{text:prompt}]}],
-        generationConfig:{temperature:0.1,maxOutputTokens:600}
-      })
+      headers:{'authorization':'Bearer '+finalKey,'content-type':'application/json'},
+      body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:prompt}],max_tokens:600,temperature:0.1})
     });
-    if(!res.ok){const e=await res.text();throw new Error('שגיאת Gemini '+res.status+': '+e.slice(0,150));}
+    if(!res.ok){const e=await res.text();throw new Error('Groq '+res.status+': '+e.slice(0,150));}
     const d=await res.json();
-    const raw=(d.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/```json|```/g,'').trim();
+    const raw=(d.choices?.[0]?.message?.content||'').replace(/```json|```/g,'').trim();
     const p=JSON.parse(raw);
     const mk=(o,r)=>({name:'',id:'',address:'',phone:'',fax:'',email:'',...o,_role:r});
     showReview([mk(p.petitioner||{},'p'),mk(p.respondent||{},'r')]);
-  }catch(e){showStat('scan-stat','שגיאת Gemini: '+e.message,'err');}
+  }catch(e){showStat('scan-stat','שגיאת Groq: '+e.message,'err');}
 }
 async function fromPDF(file){
   pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -473,7 +470,7 @@ function showStat(id,msg,cls){const el=$(id);el.textContent=msg;el.className='st
   $('ct_city').value='באר שבע';onCourtCity();
   $('has_atty').checked=true;$('atty-flds').style.display='';
   sync();
-  const sk=localStorage.getItem('gk');if(sk&&$('ai-key'))$('ai-key').value=sk;
+  const sk=localStorage.getItem('grk');if(sk&&$('ai-key'))$('ai-key').value=sk;
 })();
 
 function toggleMobPreview(){

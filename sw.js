@@ -1,4 +1,4 @@
-const CACHE = 'tet254-v5';
+const CACHE = 'tet254-v6';
 const CORE = [
   './form-254.html',
   './manifest.json',
@@ -36,6 +36,7 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
