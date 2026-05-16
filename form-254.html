@@ -239,7 +239,7 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
     <div class="fld" id="ov-r-email" style="left:96px; top:728px;width:218px;height:32px"></div>
     <!-- other name: y0=591.8→790px h=16px -->
     <div class="fld" id="ov-other" style="left:372px;top:778px;width:138px;height:28px;font-size:12pt;align-items:flex-end"></div>
-    <div class="fld" id="ov-rel"   style="left:99px;top:787px;width:220px;height:16px;font-size:12pt;background:#fff;justify-content:flex-start"></div>
+    <div class="fld" id="ov-rel"   style="left:99px;top:787px;width:220px;height:16px;font-size:12pt;background:#fff;justify-content:flex-start;overflow:hidden"></div>
     <div class="fld" id="ov-cb"   style="left:682px;top:896px;width:26px;height:26px;font-size:12pt"></div>
   </div>
   </div>
@@ -280,7 +280,10 @@ function sync(){
   $('ov-r-phone').textContent=v('r_phone');$('ov-r-fax').textContent=v('r_fax');$('ov-r-email').textContent=v('r_email');
   $('ov-other').textContent=v('other_name');
   const relMap={spouse:'בן זוגי',parent:'הורהו של ילדי',child:'ילדי',father:'אבי',mother:'אמי'};
-  $('ov-rel').textContent=relMap[$('rel').value]?' '+relMap[$('rel').value]:'';
+  const MAX_REL=[...'הורהו של ילדי'].length;
+  const relVal=relMap[$('rel').value]||'';
+  const relPad=relVal?relVal+' '.repeat(Math.max(0,MAX_REL-[...relVal].length)):'';
+  $('ov-rel').textContent=relPad?' '+relPad:'';
   $('ov-cb').textContent=$('cb_disclaimer').checked?'✓':'';
 }
 function toggleAtty(){$('atty-flds').style.display=$('has_atty').checked?'':'none';sync();}
