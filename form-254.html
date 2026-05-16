@@ -195,7 +195,7 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
     בתיבת ההדפסה: בחר <strong>שמור כ-PDF</strong> ובטל כותרות עמוד
   </div>
   <div class="stat" id="pdf-stat"></div>
-  <div class="sh" style="cursor:pointer;margin-top:8px" onclick="var n=this.nextElementSibling;n.style.display=n.style.display?'':'block'">⚙ Gemini AI — הגדרות מפתח</div>
+  <div class="sh" style="cursor:pointer;margin-top:8px" onclick="var n=this.nextElementSibling;n.style.display=n.style.display==='block'?'none':'block'">⚙ Gemini AI — הגדרות מפתח</div>
   <div class="fg" style="display:none">
     <label>מפתח Gemini API (נשמר במכשיר בלבד)</label>
     <input type="password" id="ai-key" placeholder="AIza..." oninput="localStorage.setItem('gk',this.value)">
