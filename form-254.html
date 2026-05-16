@@ -434,7 +434,7 @@ Return ONLY a valid JSON object. No explanations, no markdown, no extra text.
 # INPUT TEXT
 ${text.slice(0,3000)}`;
   try{
-    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${finalKey}`,{
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${finalKey}`,{
       method:'POST',
       headers:{'content-type':'application/json'},
       body:JSON.stringify({
