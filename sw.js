@@ -1,4 +1,4 @@
-const CACHE = 'tet254-v3';
+const CACHE = 'tet254-v4';
 const CORE = [
   './form-254.html',
   './manifest.json',

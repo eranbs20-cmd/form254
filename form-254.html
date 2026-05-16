@@ -14,7 +14,6 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -280,20 +279,49 @@ async function exportPDF(){
   const s=$('pdf-stat');
   s.className='stat';s.textContent='מייצר PDF...';
   try{
-    const fp=$('form-preview');
-    const savedZoom=fp.style.zoom;
-    fp.style.zoom='';
-    const canvas=await html2canvas(fp,{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#fff',width:794,height:1123});
-    fp.style.zoom=savedZoom;
+    const SCALE=2,W=794,H=1123;
+    const cv=document.createElement('canvas');
+    cv.width=W*SCALE;cv.height=H*SCALE;
+    const ctx=cv.getContext('2d');
+    ctx.scale(SCALE,SCALE);
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+    // Draw background form image (always in DOM even when .pp is hidden)
+    const bgImg=$('pdf-bg');
+    await new Promise(res=>{if(bgImg.complete)res();else{bgImg.onload=res;bgImg.onerror=res;}});
+    ctx.drawImage(bgImg,0,0,W,H);
+    // Draw each text field at its exact position
+    document.querySelectorAll('#form-preview .fld').forEach(fld=>{
+      const txt=fld.value!==undefined?fld.value:fld.textContent;
+      if(!txt||!txt.trim())return;
+      const l=parseFloat(fld.style.left)||0;
+      const t=parseFloat(fld.style.top)||0;
+      const w=parseFloat(fld.style.width)||200;
+      const h=parseFloat(fld.style.height)||20;
+      let fs=14.67;
+      if(fld.style.fontSize){
+        const fsr=fld.style.fontSize;
+        fs=fsr.includes('pt')?parseFloat(fsr)*96/72:parseFloat(fsr);
+      }
+      const bold=fld.style.fontWeight==='bold'||fld.classList.contains('fld-bold');
+      ctx.font=(bold?'bold ':'')+fs+'px "Frank Ruhl Libre",serif';
+      ctx.direction='rtl';ctx.textAlign='right';ctx.textBaseline='middle';
+      ctx.fillStyle='#000';
+      ctx.save();ctx.beginPath();ctx.rect(l,t,w,h);ctx.clip();
+      // For checkboxes just draw an X or checkmark
+      if(fld.type==='checkbox'){
+        if(fld.checked){ctx.textAlign='center';ctx.fillText('✓',l+w/2,t+h/2);}
+      } else {
+        ctx.fillText(txt.trim(),l+w-2,t+h/2);
+      }
+      ctx.restore();
+    });
     const {jsPDF}=window.jspdf;
     const pdf=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
-    pdf.addImage(canvas.toDataURL('image/jpeg',0.97),'JPEG',0,0,210,297);
+    pdf.addImage(cv.toDataURL('image/jpeg',0.97),'JPEG',0,0,210,297);
     pdf.save('form-254.pdf');
     s.className='stat ok';s.textContent='הקובץ נשמר ✓';
     setTimeout(()=>{s.textContent='';s.className='stat';},5000);
-  }catch(e){
-    s.className='stat err';s.textContent='שגיאה: '+e.message;
-  }
+  }catch(e){s.className='stat err';s.textContent='שגיאה: '+e.message;}
 }
 function xTab(t){$('tab-file').style.display=t==='file'?'':'none';$('tab-paste').style.display=t==='paste'?'':'none';$('xt-file').classList.toggle('on',t==='file');$('xt-paste').classList.toggle('on',t==='paste');}
 const PHONE_STR='0(?:[23489]|5[0-9]|7[2-9])[\\-\\s]?\\d{3}[\\-\\s]?\\d{4}';
