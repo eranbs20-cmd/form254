@@ -414,22 +414,37 @@ async function extractWithAI(){
   const text=$('paste-area').value.trim()||_lastScanText;
   if(!text){showStat('scan-stat','הדבק טקסט או העלה מסמך תחילה','err');return;}
   showStat('scan-stat','שולח ל-Groq AI...');
-  const prompt=`# ROLE & TASK
-You are a Hebrew Legal Data Extraction Engine. Extract party information from an Israeli dispute resolution form text.
+  const prompt=`# ROLE
+You are a strict, production-grade Legal Data Extraction Engine specialized in Israeli court and welfare documents. Your goal is to extract information into a clean JSON structure while completely filtering out institutional data from personal data fields.
 
-# STRICT OUTPUT RULE
+# CRITICAL FILTERING RULES (READ BEFORE PROCESSING)
+1. **Institutional Data Isolation:**
+   - DO NOT extract the phone numbers, faxes, addresses, or emails of the court or "יחידת הסיוע" (e.g., 072-3745230, 02-5085088, yechidathasiyua@justice.gov.il, שד' רגר) into the parties' personal fields.
+   - If a party's personal phone/email/fax is NOT explicitly stated in the document, leave those specific fields completely EMPTY (""). Do not reuse institutional contact info.
+
+2. **ID vs. Case Number Validation:**
+   - Israeli ID numbers (ת.ז.) must be exactly 9 digits (or 8 digits if dropping the leading zero).
+   - NEVER extract case numbers (e.g., format like XXXX-XX-XX) into an ID field.
+
+3. **Name Matching:**
+   - Locate "צד א'" or the first party's name as Party 1 (petitioner).
+   - Locate "צד ב'" or the second party's name as Party 2 (respondent). Do not hallucinate or truncate names.
+
+# EXTRACTION INSTRUCTIONS
+- **petitioner** (צד א' / מבקש):
+  * name: Full Hebrew name only (no titles like עו"ד)
+  * id: Israeli ID (9 digits, digits only — NOT a case number)
+  * address: Personal address only. If only city is known write "רחוב לא צוין, [שם העיר]". Leave empty if unknown.
+  * phone: ONLY personal phone, digits only, no dashes. Empty if unknown.
+  * fax: ONLY personal fax, digits only, no dashes. Empty if unknown.
+  * email: ONLY personal email, lowercase. Empty if unknown.
+
+- **respondent** (צד ב' / משיב):
+  * Same fields as petitioner.
+
+# OUTPUT FORMAT
 Return ONLY a valid JSON object. No explanations, no markdown, no extra text.
-
-# JSON FORMAT
 {"petitioner":{"name":"","id":"","address":"","phone":"","fax":"","email":""},"respondent":{"name":"","id":"","address":"","phone":"","fax":"","email":""}}
-
-# FIELD RULES
-- name: Full Hebrew name only (no titles like עו"ד, no ID numbers)
-- id: Israeli ID number (9 digits, digits only)
-- address: Street + number + city (no apartment number)
-- phone: digits only, no dashes
-- fax: digits only, no dashes
-- email: lowercase email address
 
 # INPUT TEXT
 ${text.slice(0,3000)}`;
