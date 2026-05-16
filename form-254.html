@@ -195,8 +195,8 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
     בתיבת ההדפסה: בחר <strong>שמור כ-PDF</strong> ובטל כותרות עמוד
   </div>
   <div class="stat" id="pdf-stat"></div>
-  <div class="sh" style="cursor:pointer;margin-top:8px" onclick="var n=this.nextElementSibling;n.style.display=n.style.display==='block'?'none':'block'">⚙ Gemini AI — הגדרות מפתח</div>
-  <div class="fg" style="display:none">
+  <div class="sh" style="margin-top:8px">⚙ Gemini AI — מפתח API</div>
+  <div class="fg">
     <label>מפתח Gemini API (נשמר במכשיר בלבד)</label>
     <input type="password" id="ai-key" placeholder="AIza..." oninput="localStorage.setItem('gk',this.value)">
     <div style="font-size:10px;color:#888;margin-top:2px">המפתח נשמר רק במכשירך ולא נשלח לאף שרת חיצוני</div>
@@ -473,6 +473,7 @@ function showStat(id,msg,cls){const el=$(id);el.textContent=msg;el.className='st
   $('ct_city').value='באר שבע';onCourtCity();
   $('has_atty').checked=true;$('atty-flds').style.display='';
   sync();
+  const sk=localStorage.getItem('gk');if(sk&&$('ai-key'))$('ai-key').value=sk;
 })();
 
 function toggleMobPreview(){
