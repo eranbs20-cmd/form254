@@ -424,34 +424,24 @@ async function extractWithAI(){
   const text=$('paste-area').value.trim()||_lastScanText;
   if(!text){showStat('scan-stat','הדבק טקסט או העלה מסמך תחילה','err');return;}
   showStat('scan-stat','שולח ל-Groq AI...');
-  const prompt=`# ROLE
-You are a strict, production-grade Legal Data Extraction Engine specialized in Israeli court and welfare documents. Your goal is to extract information into a clean JSON structure while completely filtering out institutional data from personal data fields.
+  const prompt=`אתה עוזר בינה מלאכותית המומחה בחילוץ נתונים מדויק מתוך מסמכים משפטיים ישראליים.
+לפניך טקסט מתוך "בקשה ליישוב סכסוך".
 
-# CRITICAL ISOLATION LOGIC
-Before extracting any value, classify all entities into two categories:
-1. Institutional Entities: Courts (בית משפט), Welfare/Support Units (יחידת הסיוע), Social Workers (עו"ס), Government Ministries, Police, or institutional legal representation.
-2. Individual Parties: The actual private citizens involved (צד א'/ב', מבקש/משיב, תובע/נתבע).
+הנחיות עבודה קשיחות:
+1. דיוק מוחלט: חלץ אך ורק נתונים המופיעים במפורש בטקסט.
+2. איסור ניחושים: אם שדה אינו קיים במסמך — החזר מחרוזת ריקה "" בלבד.
+3. ערך בלבד, ללא תוויות: אין לכלול מילות תפקיד כגון "המבקש", "הנתבעת", "ת.ז.", "טלפון" — רק את הערך עצמו.
+4. שם מלא: שם פרטי ומשפחה בלבד. ללא תואר (עו"ד, ד"ר, מר, גב').
+5. תעודת זהות: ספרות בלבד, 8–9 ספרות. לא מספר תיק (שמכיל מקפים).
+6. טלפון ופקס: ספרות בלבד, ללא מקפים ורווחים.
+7. כתובת: רחוב + מספר + עיר. ללא מספר דירה.
+8. דוא"ל: אותיות קטנות בלבד.
+9. אפס דליפת נתונים מוסדיים: מספרי טלפון/פקס/מייל/כתובת של בית המשפט, יחידת הסיוע, או עורך דין — אסור להכניסם לשדות האישיים.
 
-# STRICT FILTERING & EXTRACTION RULES
-
-## 1. Zero Institutional Data Leakage
-- FORBIDDEN: You are strictly forbidden from copying phone numbers, faxes, emails, or addresses belonging to an Institutional Entity into the personal fields of an Individual Party.
-- Empty Field Rule: If an Individual Party's personal phone, fax, email, or address is NOT explicitly written in the document, you MUST return an empty string ("") for that field. Never use institutional data as a fallback.
-
-## 2. Strict ID (ת.ז.) Validation
-- A personal Israeli ID number must consist of exactly 8-9 digits.
-- NO MUTATIONS: Copy the digits exactly as they appear. Do not alter or shift digits.
-- NO CASE NUMBERS: Never extract court case numbers (numbers with dashes like 1234-56-78) into an ID field.
-
-## 3. Dynamic Party Identification
-- Scan the document chronologically. Assign the first individual citizen found to party_1 and the second to party_2.
-- Extract full names exactly as written, without truncating or modifying them.
-
-# OUTPUT FORMAT
-Return ONLY a raw, valid JSON object. No markdown, no explanations, just the raw JSON.
+מבנה הפלט: החזר JSON בלבד, ללא markdown, ללא הסברים.
 {"party_1":{"full_name":"","id":"","address":"","phone":"","fax":"","email":""},"party_2":{"full_name":"","id":"","address":"","phone":"","fax":"","email":""}}
 
-# INPUT TEXT
+הטקסט לחילוץ:
 ${text.slice(0,3000)}`;
   try{
     const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
