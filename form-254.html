@@ -398,9 +398,7 @@ function toggleMobPreview(){
   if(showing){
     const scale=Math.min(1,(window.innerWidth-20)/794);
     const fp=document.getElementById('form-preview');
-    fp.style.transform='scale('+scale+')';
-    fp.style.marginBottom=((fp.offsetHeight*(scale-1)))+'px';
-    fp.parentElement.style.minHeight=(fp.offsetHeight*scale)+'px';
+    fp.style.zoom=scale;
   }
 }
 if('serviceWorker' in navigator){
