@@ -14,6 +14,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
@@ -274,7 +276,25 @@ function sync(){
   $('ov-cb').textContent=$('cb_disclaimer').checked?'✓':'';
 }
 function toggleAtty(){$('atty-flds').style.display=$('has_atty').checked?'':'none';sync();}
-function exportPDF(){const s=$('pdf-stat');s.className='stat';s.textContent='פותח תיבת הדפסה...';setTimeout(()=>{window.print();s.className='stat ok';s.textContent='בחר "שמור כ-PDF" ובטל כותרות עמוד';setTimeout(()=>{s.textContent='';s.className='stat';},9000);},80);}
+async function exportPDF(){
+  const s=$('pdf-stat');
+  s.className='stat';s.textContent='מייצר PDF...';
+  try{
+    const fp=$('form-preview');
+    const savedZoom=fp.style.zoom;
+    fp.style.zoom='';
+    const canvas=await html2canvas(fp,{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#fff',width:794,height:1123});
+    fp.style.zoom=savedZoom;
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+    pdf.addImage(canvas.toDataURL('image/jpeg',0.97),'JPEG',0,0,210,297);
+    pdf.save('form-254.pdf');
+    s.className='stat ok';s.textContent='הקובץ נשמר ✓';
+    setTimeout(()=>{s.textContent='';s.className='stat';},5000);
+  }catch(e){
+    s.className='stat err';s.textContent='שגיאה: '+e.message;
+  }
+}
 function xTab(t){$('tab-file').style.display=t==='file'?'':'none';$('tab-paste').style.display=t==='paste'?'':'none';$('xt-file').classList.toggle('on',t==='file');$('xt-paste').classList.toggle('on',t==='paste');}
 const PHONE_STR='0(?:[23489]|5[0-9]|7[2-9])[\\-\\s]?\\d{3}[\\-\\s]?\\d{4}';
 const ADDR_LINE=/(?:רחוב|רח[׳']|שדרות|שד[׳']|דרך|סמטת?|כיכר|קיבוץ|מושב)/i;
