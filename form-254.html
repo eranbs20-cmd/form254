@@ -306,9 +306,7 @@ async function exportPDF(){
       ctx.font=(bold?'bold ':'')+fs+'px "Frank Ruhl Libre",serif';
       ctx.direction='rtl';ctx.textAlign='right';ctx.textBaseline='middle';
       ctx.save();ctx.beginPath();ctx.rect(l,t,w,h);ctx.clip();
-      // Erase background image text before drawing value
-      const hasBg=fld.style.background==='#fff'||fld.style.background==='white'||fld.style.backgroundColor==='#fff';
-      if(hasBg){ctx.fillStyle='#fff';ctx.fillRect(l,t,w,h);}
+      ctx.fillStyle='#fff';ctx.fillRect(l,t,w,h);
       ctx.fillStyle='#000';
       // For checkboxes just draw a checkmark
       if(fld.type==='checkbox'){
