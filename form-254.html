@@ -112,9 +112,10 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
       <button class="xt" id="xt-paste" onclick="xTab('paste')">הדבק טקסט</button>
     </div>
     <div id="tab-file">
-      <input type="file" id="scan-file" accept="image/*,.pdf,.docx,.doc,.txt,.rtf" style="display:none" onchange="doScan()">
-      <div style="font-size:10.5px;color:#999;margin:1px 0 5px">תמונה · PDF · Word · טקסט</div>
-      <button class="btn-g" id="btn-scan" onclick="document.getElementById('scan-file').click()">העלה מסמך וחלץ נתונים</button>
+      <input type="file" id="scan-file" accept="image/*,.pdf,.docx,.doc,.txt,.rtf,.odt,.pages,.jpeg,.jpg,.png,.heic" multiple style="display:none" onchange="doScan()">
+      <div style="font-size:10.5px;color:#999;margin:1px 0 5px">תמונה · PDF · Word · טקסט — אפשר כמה קבצים</div>
+      <button class="btn-g" id="btn-scan" onclick="document.getElementById('scan-file').click()">העלה קבצים וחלץ נתונים</button>
+      <div id="file-names" style="display:none;margin-top:6px;font-size:11px;color:#2563a8;background:#eef3fb;border-radius:6px;padding:5px 8px;border:1px solid #c0d0ea;direction:rtl;word-break:break-word"></div>
       <button class="btn-g" style="background:#6c3fc5;margin-top:4px" onclick="extractWithAI()">✨ חלץ עם Groq AI</button>
     </div>
     <div id="tab-paste" style="display:none">
@@ -390,14 +391,23 @@ let _ocr=null,_lastScanText='';
 async function getOCR(){if(_ocr)return _ocr;showStat('scan-stat','טוען מנוע זיהוי...');_ocr=await Tesseract.createWorker('heb',1,{logger:m=>{if(m.status==='recognizing text')showStat('scan-stat','מזהה... '+Math.round((m.progress||0)*100)+'%');}});return _ocr;}
 async function doScan(){
   const fi=$('scan-file');if(!fi.files.length)return;
-  const file=fi.files[0],btn=$('btn-scan');btn.disabled=true;
-  try{showStat('scan-stat','מעבד...');const name=file.name.toLowerCase();let text='';
-    if(file.type==='application/pdf'||name.endsWith('.pdf'))text=await fromPDF(file);
-    else if(name.endsWith('.docx')||name.endsWith('.doc'))text=await fromDocx(file);
-    else if(file.type==='text/plain'||name.endsWith('.txt')||name.endsWith('.rtf'))text=await fromText(file);
-    else text=await fromImage(file);
-    _lastScanText=text;
-    const parties=extractMulti(text);
+  const files=[...fi.files],btn=$('btn-scan');btn.disabled=true;
+  const fnd=$('file-names');
+  fnd.style.display='block';
+  fnd.innerHTML='📎 '+files.map(f=>'<strong>'+f.name+'</strong>').join(' &nbsp;·&nbsp; ');
+  try{
+    showStat('scan-stat','מעבד '+files.length+(files.length>1?' קבצים':' קובץ')+'...');
+    let allText='';
+    for(const file of files){
+      const name=file.name.toLowerCase();let text='';
+      if(file.type==='application/pdf'||name.endsWith('.pdf'))text=await fromPDF(file);
+      else if(name.endsWith('.docx')||name.endsWith('.doc'))text=await fromDocx(file);
+      else if(file.type==='text/plain'||name.endsWith('.txt')||name.endsWith('.rtf'))text=await fromText(file);
+      else text=await fromImage(file);
+      allText+=text+'\n\n';
+    }
+    _lastScanText=allText.trim();
+    const parties=extractMulti(_lastScanText);
     if(!parties.length)showStat('scan-stat','לא זוהו פרטים — נסה חילוץ AI','');else showReview(parties);
   }catch(e){showStat('scan-stat','שגיאה: '+e.message,'err');_ocr=null;}
   finally{btn.disabled=false;fi.value='';}
@@ -417,34 +427,29 @@ async function extractWithAI(){
   const prompt=`# ROLE
 You are a strict, production-grade Legal Data Extraction Engine specialized in Israeli court and welfare documents. Your goal is to extract information into a clean JSON structure while completely filtering out institutional data from personal data fields.
 
-# CRITICAL FILTERING RULES (READ BEFORE PROCESSING)
-1. **Institutional Data Isolation:**
-   - DO NOT extract the phone numbers, faxes, addresses, or emails of the court or "יחידת הסיוע" (e.g., 072-3745230, 02-5085088, yechidathasiyua@justice.gov.il, שד' רגר) into the parties' personal fields.
-   - If a party's personal phone/email/fax is NOT explicitly stated in the document, leave those specific fields completely EMPTY (""). Do not reuse institutional contact info.
+# CRITICAL ISOLATION LOGIC
+Before extracting any value, classify all entities into two categories:
+1. Institutional Entities: Courts (בית משפט), Welfare/Support Units (יחידת הסיוע), Social Workers (עו"ס), Government Ministries, Police, or institutional legal representation.
+2. Individual Parties: The actual private citizens involved (צד א'/ב', מבקש/משיב, תובע/נתבע).
 
-2. **ID vs. Case Number Validation:**
-   - Israeli ID numbers (ת.ז.) must be exactly 9 digits (or 8 digits if dropping the leading zero).
-   - NEVER extract case numbers (e.g., format like XXXX-XX-XX) into an ID field.
+# STRICT FILTERING & EXTRACTION RULES
 
-3. **Name Matching:**
-   - Locate "צד א'" or the first party's name as Party 1 (petitioner).
-   - Locate "צד ב'" or the second party's name as Party 2 (respondent). Do not hallucinate or truncate names.
+## 1. Zero Institutional Data Leakage
+- FORBIDDEN: You are strictly forbidden from copying phone numbers, faxes, emails, or addresses belonging to an Institutional Entity into the personal fields of an Individual Party.
+- Empty Field Rule: If an Individual Party's personal phone, fax, email, or address is NOT explicitly written in the document, you MUST return an empty string ("") for that field. Never use institutional data as a fallback.
 
-# EXTRACTION INSTRUCTIONS
-- **petitioner** (צד א' / מבקש):
-  * name: Full Hebrew name only (no titles like עו"ד)
-  * id: Israeli ID (9 digits, digits only — NOT a case number)
-  * address: Personal address only. If only city is known write "רחוב לא צוין, [שם העיר]". Leave empty if unknown.
-  * phone: ONLY personal phone, digits only, no dashes. Empty if unknown.
-  * fax: ONLY personal fax, digits only, no dashes. Empty if unknown.
-  * email: ONLY personal email, lowercase. Empty if unknown.
+## 2. Strict ID (ת.ז.) Validation
+- A personal Israeli ID number must consist of exactly 8-9 digits.
+- NO MUTATIONS: Copy the digits exactly as they appear. Do not alter or shift digits.
+- NO CASE NUMBERS: Never extract court case numbers (numbers with dashes like 1234-56-78) into an ID field.
 
-- **respondent** (צד ב' / משיב):
-  * Same fields as petitioner.
+## 3. Dynamic Party Identification
+- Scan the document chronologically. Assign the first individual citizen found to party_1 and the second to party_2.
+- Extract full names exactly as written, without truncating or modifying them.
 
 # OUTPUT FORMAT
-Return ONLY a valid JSON object. No explanations, no markdown, no extra text.
-{"petitioner":{"name":"","id":"","address":"","phone":"","fax":"","email":""},"respondent":{"name":"","id":"","address":"","phone":"","fax":"","email":""}}
+Return ONLY a raw, valid JSON object. No markdown, no explanations, just the raw JSON.
+{"party_1":{"full_name":"","id":"","address":"","phone":"","fax":"","email":""},"party_2":{"full_name":"","id":"","address":"","phone":"","fax":"","email":""}}
 
 # INPUT TEXT
 ${text.slice(0,3000)}`;
@@ -458,8 +463,8 @@ ${text.slice(0,3000)}`;
     const d=await res.json();
     const raw=(d.choices?.[0]?.message?.content||'').replace(/```json|```/g,'').trim();
     const p=JSON.parse(raw);
-    const mk=(o,r)=>({name:'',id:'',address:'',phone:'',fax:'',email:'',...o,_role:r});
-    showReview([mk(p.petitioner||{},'p'),mk(p.respondent||{},'r')]);
+    const mk=(o,r)=>({name:o.full_name||o.name||'',id:o.id||'',address:o.address||'',phone:o.phone||'',fax:o.fax||'',email:o.email||'',_role:r});
+    showReview([mk(p.party_1||p.petitioner||{},'p'),mk(p.party_2||p.respondent||{},'r')]);
   }catch(e){showStat('scan-stat','שגיאת Groq: '+e.message,'err');}
 }
 async function fromPDF(file){
