@@ -252,8 +252,8 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
     <div class="fld" id="ov-other" style="left:372px;top:778px;width:138px;height:28px;font-size:12pt;align-items:flex-end"></div>
     <div class="fld" id="ov-rel"   style="left:99px;top:787px;width:220px;height:16px;font-size:12pt;background:#fff;justify-content:flex-start;overflow:hidden"></div>
     <div class="fld" id="ov-cb"   style="left:682px;top:896px;width:26px;height:26px;font-size:12pt"></div>
-    <div class="fld" id="ov-sig-p" style="left:35px;top:840px;width:260px;height:145px;justify-content:center;align-items:flex-end;font-weight:normal"></div>
-    <div class="fld" id="ov-sig-r" style="left:480px;top:840px;width:240px;height:145px;justify-content:center;align-items:flex-end;font-weight:normal"></div>
+    <div class="fld" id="ov-sig-p" style="left:115px;top:922px;width:205px;height:70px;justify-content:center;align-items:flex-end;font-weight:normal"></div>
+    <div class="fld" id="ov-sig-r" style="left:480px;top:922px;width:205px;height:70px;justify-content:center;align-items:flex-end;font-weight:normal"></div>
   </div>
   </div>
 </div>
@@ -513,7 +513,7 @@ let _sigRole='p',_sigP='',_sigR='';
 function applySig(role,url){
   if(role==='p')_sigP=url;else _sigR=url;
   const ov=$('ov-sig-'+role);
-  ov.innerHTML='<img src="'+url+'" style="width:100%;height:auto;display:block">';
+  ov.innerHTML='<img src="'+url+'" style="width:100%;height:100%;object-fit:contain;display:block">';
   ov.style.cursor='pointer';ov.style.pointerEvents='auto';
   ov.onclick=()=>openSig(role);
   closeSigModal();showStat('sig-stat','✓ חתימה נשמרה — לחץ לתיקון','ok');setTimeout(()=>showStat('sig-stat','',''),4000);
@@ -525,7 +525,7 @@ function trimmedDataURL(canvas){
   let x0=w,x1=0,y0=h,y1=0;
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(d[(y*w+x)*4+3]>10){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);}}
   if(x1<x0)return canvas.toDataURL('image/png');
-  const pad=15,tw=x1-x0+pad*2,th=y1-y0+pad*2;
+  const pad=3,tw=x1-x0+pad*2,th=y1-y0+pad*2;
   const tmp=document.createElement('canvas');tmp.width=tw;tmp.height=th;
   tmp.getContext('2d').drawImage(canvas,x0-pad,y0-pad,tw,th,0,0,tw,th);
   return tmp.toDataURL('image/png');
