@@ -252,8 +252,8 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
     <div class="fld" id="ov-other" style="left:372px;top:778px;width:138px;height:28px;font-size:12pt;align-items:flex-end"></div>
     <div class="fld" id="ov-rel"   style="left:99px;top:787px;width:220px;height:16px;font-size:12pt;background:#fff;justify-content:flex-start;overflow:hidden"></div>
     <div class="fld" id="ov-cb"   style="left:682px;top:896px;width:26px;height:26px;font-size:12pt"></div>
-    <div class="fld" id="ov-sig-p" style="left:35px;top:1003px;width:235px;height:32px;justify-content:center;align-items:center;font-weight:normal"></div>
-    <div class="fld" id="ov-sig-r" style="left:480px;top:1003px;width:220px;height:32px;justify-content:center;align-items:center;font-weight:normal"></div>
+    <div class="fld" id="ov-sig-p" style="left:35px;top:988px;width:235px;height:32px;justify-content:center;align-items:center;font-weight:normal"></div>
+    <div class="fld" id="ov-sig-r" style="left:480px;top:988px;width:220px;height:32px;justify-content:center;align-items:center;font-weight:normal"></div>
   </div>
   </div>
 </div>
@@ -510,6 +510,19 @@ if('serviceWorker' in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 }
 let _sigRole='p',_sigP='',_sigR='';
+function uploadSigImage(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const url=e.target.result;
+    if(_sigRole==='p')_sigP=url;else _sigR=url;
+    const ov=$('ov-sig-'+_sigRole);
+    ov.innerHTML='<img src="'+url+'" style="max-width:100%;max-height:100%;object-fit:contain">';
+    ov.style.border='';ov.style.cursor='';ov.style.pointerEvents='none';ov.onclick=null;
+    closeSigModal();showStat('sig-stat','חתימה נשמרה ✓','ok');setTimeout(()=>showStat('sig-stat','',''),3000);
+  };
+  reader.readAsDataURL(file);input.value='';
+}
 function openSig(role){_sigRole=role;$('sig-title').textContent=role==='p'?'חתימת המבקש':'חתימת המשיב';clearSigCanvas();$('sig-modal').style.display='flex';}
 function closeSigModal(){$('sig-modal').style.display='none';}
 function clearSigCanvas(){const c=$('sig-canvas'),ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);}
@@ -540,7 +553,7 @@ function saveSig(){
       const s=sc(c),r=c.getBoundingClientRect();
       const x=(e.clientX-r.left)*s.x,y=(e.clientY-r.top)*s.y;
       const ctx=c.getContext('2d');
-      ctx.strokeStyle='#1a1a1a';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.lineJoin='round';
+      ctx.strokeStyle='#1a3fa8';ctx.lineWidth=3.5;ctx.lineCap='round';ctx.lineJoin='round';
       ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(x,y);ctx.stroke();
       lx=x;ly=y;
     });
@@ -708,6 +721,8 @@ window.addEventListener('hashchange',_checkHash);
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       <button onclick="clearSigCanvas()" style="background:#aaa;color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:13px">נקה</button>
       <button onclick="saveSig()" style="background:#1a6b3a;color:#fff;border:none;border-radius:6px;padding:8px 18px;cursor:pointer;font-size:13px;font-weight:bold">שמור ✓</button>
+      <button onclick="$('sig-upload-input').click()" style="background:#2563a8;color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:13px">📁 העלה תמונה</button>
+      <input type="file" id="sig-upload-input" accept="image/*" style="display:none" onchange="uploadSigImage(this)">
       <button onclick="closeSigModal()" style="background:#e55;color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:13px">ביטול</button>
     </div>
   </div>
