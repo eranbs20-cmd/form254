@@ -594,6 +594,9 @@ function decodeState(enc){
     const lt=$('lawyer-tools');if(lt)lt.style.display='none';
     const eb=$('btn-export');
     if(eb){eb.textContent='✅ אשר ושלח PDF לעורך הדין';eb.style.background='#1a6b3a';eb.onclick=confirmAndSend;}
+    const ppEl=document.querySelector('.pp');
+    if(ppEl){ppEl.classList.add('mob-show');const scale=Math.min(1,(window.innerWidth-20)/794);const fpr=$('form-preview');if(fpr)fpr.style.zoom=scale;}
+    const mpb=$('mob-preview-btn');if(mpb)mpb.style.display='none';
     if(!document.getElementById('sign-banner')){
       const b=document.createElement('div');b.id='sign-banner';
       b.style.cssText='background:#1a6b3a;color:#fff;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:10px;direction:rtl;text-align:center;line-height:1.5';
@@ -628,19 +631,41 @@ async function confirmAndSend(){
     pdf.addImage(canvas.toDataURL('image/jpeg',0.97),'JPEG',0,0,210,297);
     const pdfBlob=pdf.output('blob');
     const file=new File([pdfBlob],'טופס-254-חתום.pdf',{type:'application/pdf'});
+    // iOS / Android — native share sheet with the PDF file (user picks WhatsApp)
     if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-      await navigator.share({title:'טופס 254 חתום',files:[file]});
-      showStat('sig-stat','הקובץ נשלח ✓','ok');
-      return;
+      try{
+        await navigator.share({title:'טופס 254 חתום',text:'שלום עו"ד ערן, חתמתי על טופס 254.',files:[file]});
+        showStat('sig-stat','הקובץ נשלח ✓','ok');
+        return;
+      }catch(se){if(se.name==='AbortError')return;}
     }
+    // Fallback: download + open WhatsApp with instructions
     const burl=URL.createObjectURL(pdfBlob);
-    const a=document.createElement('a');a.href=burl;a.download='טופס-254-חתום.pdf';a.click();
-    setTimeout(()=>{
-      URL.revokeObjectURL(burl);
-      window.open('https://wa.me/972522499887?text='+encodeURIComponent('שלום עו"ד ערן, חתמתי על טופס 254. מצרף קובץ PDF חתום.'),'_blank');
-      showStat('sig-stat','PDF הורד — שלח אותו בוואטסאפ ✓','ok');
-    },1200);
+    const a=document.createElement('a');a.href=burl;a.download='טופס-254-חתום.pdf';document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(burl),8000);
+    _showSendModal();
   }catch(e){showStat('sig-stat','שגיאה: '+e.message,'err');}
+}
+function _showSendModal(){
+  if($('_send-modal'))return;
+  const waUrl='https://wa.me/972522499887?text='+encodeURIComponent('שלום עו"ד ערן, חתמתי על טופס 254. מצרף קובץ PDF חתום.');
+  const m=document.createElement('div');
+  m.id='_send-modal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:3000;display:flex;align-items:center;justify-content:center';
+  m.innerHTML='<div style="background:#fff;border-radius:14px;padding:22px 20px;width:min(360px,93vw);direction:rtl;font-family:Arial,sans-serif;text-align:center">'
+    +'<div style="font-size:38px;margin-bottom:8px">✅</div>'
+    +'<div style="font-weight:bold;font-size:16px;color:#1a3f7a;margin-bottom:12px">הקובץ החתום מוכן!</div>'
+    +'<div style="font-size:13px;color:#444;line-height:1.85;margin-bottom:18px;text-align:right">'
+    +'1. הקובץ <strong>ירד כבר</strong> למכשירך<br>'
+    +'2. לחץ "פתח וואטסאפ" — הצ\'אט של עוה"ד ייפתח<br>'
+    +'3. לחץ 📎 ← <strong>מסמך</strong> ← בחר את הקובץ שירד'
+    +'</div>'
+    +'<button id="_send-wa-btn" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:14px;font-size:15px;font-weight:bold;cursor:pointer;width:100%;margin-bottom:8px">📲 פתח וואטסאפ</button>'
+    +'<button id="_send-close-btn" style="background:#f0f0f0;color:#555;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;width:100%">סגור</button>'
+    +'</div>';
+  document.body.appendChild(m);
+  $('_send-wa-btn').onclick=()=>{window.open(waUrl,'_blank');m.remove();};
+  $('_send-close-btn').onclick=()=>m.remove();
 }
 function shareSig(){
   const enc=encodeState();
