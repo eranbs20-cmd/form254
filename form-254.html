@@ -201,7 +201,8 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
   <div class="fg">
     <button class="btn-g" style="background:#1a6b3a" onclick="openSig('p')">✍ חתימת מבקש</button>
     <button class="btn-g" style="background:#1a6b3a;margin-top:4px" onclick="openSig('r')">✍ חתימת משיב</button>
-    <button class="btn-g" style="background:#c97a00;margin-top:8px" onclick="shareSig()">🔗 צור קישור לחתימה</button>
+    <button class="btn-g" style="background:#25d366;margin-top:8px" onclick="shareViaWhatsApp()">📲 שלח לחתימה ב-WhatsApp</button>
+    <button class="btn-g" style="background:#c97a00;margin-top:4px;font-size:11px" onclick="shareSig()">🔗 העתק קישור</button>
     <div class="stat" id="sig-stat"></div>
   </div>
   <div class="sh" style="margin-top:8px">⚙ Groq AI — מפתח API (חינמי)</div>
@@ -251,8 +252,8 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
     <div class="fld" id="ov-other" style="left:372px;top:778px;width:138px;height:28px;font-size:12pt;align-items:flex-end"></div>
     <div class="fld" id="ov-rel"   style="left:99px;top:787px;width:220px;height:16px;font-size:12pt;background:#fff;justify-content:flex-start;overflow:hidden"></div>
     <div class="fld" id="ov-cb"   style="left:682px;top:896px;width:26px;height:26px;font-size:12pt"></div>
-    <div class="fld" id="ov-sig-p" style="left:480px;top:1020px;width:220px;height:60px;justify-content:center;align-items:center;font-weight:normal"></div>
-    <div class="fld" id="ov-sig-r" style="left:60px;top:1020px;width:220px;height:60px;justify-content:center;align-items:center;font-weight:normal"></div>
+    <div class="fld" id="ov-sig-p" style="left:40px;top:1010px;width:220px;height:58px;justify-content:center;align-items:center;font-weight:normal"></div>
+    <div class="fld" id="ov-sig-r" style="left:480px;top:1010px;width:220px;height:58px;justify-content:center;align-items:center;font-weight:normal"></div>
   </div>
   </div>
 </div>
@@ -566,18 +567,28 @@ function encodeState(){
 function decodeState(enc){
   try{
     const s=JSON.parse(decodeURIComponent(escape(atob(enc))));
-    // שדות רגילים (לא תלויים)
-    ['d','pn','pi','pa','pp','pf','pe','rn','ri','ra','rp','rf','re','an','aa','ap','af','ae','o','rl'].forEach(k=>{
-      const id=FK_INV[k];const el=$(id);if(!el||!(k in s))return;
-      el.value=s[k];
-    });
-    if('cb' in s){const el=$('cb_disclaimer');if(el)el.checked=s.cb;}
-    // בחירות מפל: ערכאה → מחוז → עיר
-    if('T' in s){$('ct_type').value=s.T;onCourtType();}
-    if('D' in s){$('ct_district').value=s.D;onCourtDistrict();}
-    if('C' in s){$('ct_city').value=s.C;}
+    const isNew='pn' in s||'T' in s||'rn' in s;
+    if(isNew){
+      ['d','pn','pi','pa','pp','pf','pe','rn','ri','ra','rp','rf','re','an','aa','ap','af','ae','o','rl'].forEach(k=>{
+        const id=FK_INV[k];const el=$(id);if(!el||!(k in s))return;el.value=s[k];
+      });
+      if('cb' in s){const el=$('cb_disclaimer');if(el)el.checked=s.cb;}
+      if('T' in s){$('ct_type').value=s.T;onCourtType();}
+      if('D' in s){$('ct_district').value=s.D;onCourtDistrict();}
+      if('C' in s){$('ct_city').value=s.C;}
+    } else {
+      // פורמט ישן — מפתחות ארוכים
+      ['date_f','p_name','p_id','p_addr','p_phone','p_fax','p_email',
+       'r_name','r_id','r_addr','r_phone','r_fax','r_email',
+       'a_name','a_addr','a_phone','a_fax','a_email','other_name','rel'].forEach(id=>{
+         const el=$(id);if(!el||!(id in s))return;el.value=s[id];
+       });
+      if('cb_disclaimer' in s){const el=$('cb_disclaimer');if(el)el.checked=s.cb_disclaimer;}
+      if('ct_type' in s){$('ct_type').value=s.ct_type;onCourtType();}
+      if('ct_district' in s){$('ct_district').value=s.ct_district;onCourtDistrict();}
+      if('ct_city' in s){$('ct_city').value=s.ct_city;}
+    }
     sync();
-    // מצב חתימה — הסתר כלי עו"ד
     const lt=$('lawyer-tools');if(lt)lt.style.display='none';
     if(!document.getElementById('sign-banner')){
       const b=document.createElement('div');b.id='sign-banner';
@@ -586,6 +597,12 @@ function decodeState(enc){
       const fp=document.querySelector('.fp');if(fp)fp.prepend(b);
     }
   }catch(e){console.error('decodeState:',e);}
+}
+function shareViaWhatsApp(){
+  const enc=encodeState();
+  const url=location.href.split('#')[0]+'#s='+enc;
+  const msg='שלום,\nנשלח אליך טופס לחתימה דיגיטלית.\nלחץ על הקישור הבא וחתום:\n'+url;
+  window.open('https://api.whatsapp.com/send?text='+encodeURIComponent(msg),'_blank');
 }
 function shareSig(){
   const enc=encodeState();
