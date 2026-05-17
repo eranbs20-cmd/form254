@@ -521,6 +521,7 @@ function saveSig(){
   if(_sigRole==='p')_sigP=url;else _sigR=url;
   const ov=$('ov-sig-'+_sigRole);
   ov.innerHTML='<img src="'+url+'" style="max-width:100%;max-height:100%;object-fit:contain">';
+  ov.style.border='';ov.style.cursor='';ov.style.pointerEvents='none';ov.onclick=null;
   closeSigModal();showStat('sig-stat','חתימה נשמרה ✓','ok');setTimeout(()=>showStat('sig-stat','',''),3000);
 }
 (function(){
@@ -594,13 +595,29 @@ function decodeState(enc){
     const lt=$('lawyer-tools');if(lt)lt.style.display='none';
     const eb=$('btn-export');
     if(eb){eb.textContent='✅ אשר ושלח PDF לעורך הדין';eb.style.background='#1a6b3a';eb.onclick=confirmAndSend;}
+    const mpb=$('mob-preview-btn');if(mpb)mpb.style.display='none';
+    // הצג תצוגה מקדימה אוטומטית במובייל
     const ppEl=document.querySelector('.pp');
     if(ppEl){ppEl.classList.add('mob-show');const scale=Math.min(1,(window.innerWidth-20)/794);const fpr=$('form-preview');if(fpr)fpr.style.zoom=scale;}
-    const mpb=$('mob-preview-btn');if(mpb)mpb.style.display='none';
+    // הפוך את אזור חתימת המבקש ללחיץ ישירות מהטופס
+    const svp=$('ov-sig-p');
+    if(svp&&!svp.querySelector('img')){
+      svp.style.pointerEvents='auto';svp.style.cursor='pointer';
+      svp.style.border='2px dashed #1a6b3a';svp.style.borderRadius='4px';
+      svp.innerHTML='<span style="color:#1a6b3a;font-size:11px;font-family:Arial;font-weight:normal">✍ לחץ לחתימה</span>';
+      svp.onclick=()=>{svp.innerHTML='';svp.style.border='';svp.style.cursor='';svp.style.pointerEvents='none';openSig('p');};
+    }
+    // כפתור floating תמיד נראה בתחתית המסך
+    if(!$('_float-send')){
+      const fb=document.createElement('button');fb.id='_float-send';
+      fb.style.cssText='position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1a6b3a;color:#fff;border:none;border-radius:12px;padding:15px 28px;font-size:15px;font-weight:bold;cursor:pointer;z-index:1500;box-shadow:0 4px 18px rgba(0,0,0,.35);font-family:Arial,sans-serif;direction:rtl;white-space:nowrap';
+      fb.textContent='✅ שלח PDF לעורך הדין';fb.onclick=confirmAndSend;
+      document.body.appendChild(fb);
+    }
     if(!document.getElementById('sign-banner')){
       const b=document.createElement('div');b.id='sign-banner';
       b.style.cssText='background:#1a6b3a;color:#fff;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:10px;direction:rtl;text-align:center;line-height:1.5';
-      b.innerHTML='✍ מצב חתימה<br><span style="font-size:11px;opacity:.85">חתום ואז לחץ "אשר ושלח PDF"</span>';
+      b.innerHTML='✍ מצב חתימה<br><span style="font-size:11px;opacity:.85">לחץ על "✍ לחץ לחתימה" בטופס, חתום ואז לחץ "שלח PDF"</span>';
       const fp=document.querySelector('.fp');if(fp)fp.prepend(b);
     }
   }catch(e){console.error('decodeState:',e);}
