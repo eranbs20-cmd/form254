@@ -546,23 +546,62 @@ function saveSig(){
     c.addEventListener('pointercancel',()=>drawing=false);
   });
 })();
-const SHARE_FIELDS=['ct_type','ct_district','ct_city','date_f','p_name','p_id','p_addr','p_phone','p_fax','p_email','r_name','r_id','r_addr','r_phone','r_fax','r_email','a_name','a_addr','a_phone','a_fax','a_email','other_name','rel','cb_disclaimer'];
-function encodeState(){const s={};SHARE_FIELDS.forEach(id=>{const el=$(id);if(el)s[id]=el.type==='checkbox'?el.checked:el.value;});return btoa(unescape(encodeURIComponent(JSON.stringify(s))));}
+// ─── URL State (short keys, skip empty) ──────────────
+const FK={ct_type:'T',ct_district:'D',ct_city:'C',date_f:'d',
+  p_name:'pn',p_id:'pi',p_addr:'pa',p_phone:'pp',p_fax:'pf',p_email:'pe',
+  r_name:'rn',r_id:'ri',r_addr:'ra',r_phone:'rp',r_fax:'rf',r_email:'re',
+  a_name:'an',a_addr:'aa',a_phone:'ap',a_fax:'af',a_email:'ae',
+  other_name:'o',rel:'rl',cb_disclaimer:'cb'};
+const FK_INV=Object.fromEntries(Object.entries(FK).map(([k,v])=>[v,k]));
+function encodeState(){
+  const s={};
+  Object.keys(FK).forEach(id=>{
+    const el=$(id);if(!el)return;
+    const val=el.type==='checkbox'?el.checked:el.value;
+    if(val===''||val===false)return;
+    s[FK[id]]=val;
+  });
+  return btoa(unescape(encodeURIComponent(JSON.stringify(s))));
+}
 function decodeState(enc){
   try{
     const s=JSON.parse(decodeURIComponent(escape(atob(enc))));
-    SHARE_FIELDS.forEach(id=>{const el=$(id);if(!el||!(id in s))return;if(el.type==='checkbox')el.checked=s[id];else el.value=s[id];});
+    // שדות רגילים (לא תלויים)
+    ['d','pn','pi','pa','pp','pf','pe','rn','ri','ra','rp','rf','re','an','aa','ap','af','ae','o','rl'].forEach(k=>{
+      const id=FK_INV[k];const el=$(id);if(!el||!(k in s))return;
+      el.value=s[k];
+    });
+    if('cb' in s){const el=$('cb_disclaimer');if(el)el.checked=s.cb;}
+    // בחירות מפל: ערכאה → מחוז → עיר
+    if('T' in s){$('ct_type').value=s.T;onCourtType();}
+    if('D' in s){$('ct_district').value=s.D;onCourtDistrict();}
+    if('C' in s){$('ct_city').value=s.C;}
     sync();
-    // signing mode — hide lawyer tools
+    // מצב חתימה — הסתר כלי עו"ד
     const lt=$('lawyer-tools');if(lt)lt.style.display='none';
-    const banner=document.createElement('div');
-    banner.style.cssText='background:#1a6b3a;color:#fff;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:10px;direction:rtl;text-align:center;line-height:1.5';
-    banner.innerHTML='✍ מצב חתימה<br><span style="font-size:11px;opacity:.85">חתום על הטופס ואז לחץ "ייצא PDF"</span>';
-    const fp=document.querySelector('.fp');if(fp)fp.prepend(banner);
-  }catch(e){}
+    if(!document.getElementById('sign-banner')){
+      const b=document.createElement('div');b.id='sign-banner';
+      b.style.cssText='background:#1a6b3a;color:#fff;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:10px;direction:rtl;text-align:center;line-height:1.5';
+      b.innerHTML='✍ מצב חתימה<br><span style="font-size:11px;opacity:.85">חתום על הטופס ואז לחץ "ייצא PDF"</span>';
+      const fp=document.querySelector('.fp');if(fp)fp.prepend(b);
+    }
+  }catch(e){console.error('decodeState:',e);}
 }
-function shareSig(){const url=location.href.split('#')[0]+'#data='+encodeState();navigator.clipboard.writeText(url).then(()=>showStat('sig-stat','קישור הועתק ✓','ok')).catch(()=>prompt('העתק קישור זה:',url));setTimeout(()=>showStat('sig-stat','',''),4000);}
-window.addEventListener('load',()=>{if(location.hash.startsWith('#data='))decodeState(location.hash.slice(6));});
+function shareSig(){
+  const enc=encodeState();
+  const url=location.href.split('#')[0]+'#s='+enc;
+  navigator.clipboard.writeText(url)
+    .then(()=>showStat('sig-stat','קישור הועתק ✓','ok'))
+    .catch(()=>{const ta=document.createElement('textarea');ta.value=url;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showStat('sig-stat','קישור הועתק ✓','ok');});
+  setTimeout(()=>showStat('sig-stat','',''),4000);
+}
+function _checkHash(){
+  const h=location.hash;
+  if(h.startsWith('#s='))decodeState(h.slice(3));
+  else if(h.startsWith('#data='))decodeState(h.slice(6));
+}
+window.addEventListener('load',_checkHash);
+window.addEventListener('hashchange',_checkHash);
 </script>
 <div id="sig-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:14px;padding:20px;width:min(420px,95vw);direction:rtl;font-family:Arial,sans-serif">
