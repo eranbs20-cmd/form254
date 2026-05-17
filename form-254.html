@@ -192,7 +192,7 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
     </div>
   </div>
   <button id="mob-preview-btn" onclick="toggleMobPreview()">👁 הצג תצוגה מקדימה</button>
-  <button class="btn-r" onclick="exportPDF()">⬇ ייצא PDF</button>
+  <button id="btn-export" class="btn-r" onclick="exportPDF()">⬇ ייצא PDF</button>
   <div style="font-size:10px;color:#888;text-align:center;margin:2px 14px">
     בתיבת ההדפסה: בחר <strong>שמור כ-PDF</strong> ובטל כותרות עמוד
   </div>
@@ -252,8 +252,8 @@ body{font-family:Arial,sans-serif;background:#e2e5e9;direction:rtl}
     <div class="fld" id="ov-other" style="left:372px;top:778px;width:138px;height:28px;font-size:12pt;align-items:flex-end"></div>
     <div class="fld" id="ov-rel"   style="left:99px;top:787px;width:220px;height:16px;font-size:12pt;background:#fff;justify-content:flex-start;overflow:hidden"></div>
     <div class="fld" id="ov-cb"   style="left:682px;top:896px;width:26px;height:26px;font-size:12pt"></div>
-    <div class="fld" id="ov-sig-p" style="left:40px;top:1010px;width:220px;height:58px;justify-content:center;align-items:center;font-weight:normal"></div>
-    <div class="fld" id="ov-sig-r" style="left:480px;top:1010px;width:220px;height:58px;justify-content:center;align-items:center;font-weight:normal"></div>
+    <div class="fld" id="ov-sig-p" style="left:35px;top:1050px;width:235px;height:38px;justify-content:center;align-items:center;font-weight:normal"></div>
+    <div class="fld" id="ov-sig-r" style="left:480px;top:1050px;width:220px;height:38px;justify-content:center;align-items:center;font-weight:normal"></div>
   </div>
   </div>
 </div>
@@ -555,8 +555,10 @@ const FK={ct_type:'T',ct_district:'D',ct_city:'C',date_f:'d',
   other_name:'o',rel:'rl',cb_disclaimer:'cb'};
 const FK_INV=Object.fromEntries(Object.entries(FK).map(([k,v])=>[v,k]));
 function encodeState(){
+  const SKIP=new Set(['a_name','a_addr','a_phone','a_fax','a_email']);
   const s={};
   Object.keys(FK).forEach(id=>{
+    if(SKIP.has(id))return;
     const el=$(id);if(!el)return;
     const val=el.type==='checkbox'?el.checked:el.value;
     if(val===''||val===false)return;
@@ -590,10 +592,12 @@ function decodeState(enc){
     }
     sync();
     const lt=$('lawyer-tools');if(lt)lt.style.display='none';
+    const eb=$('btn-export');
+    if(eb){eb.textContent='✅ אשר ושלח PDF לעורך הדין';eb.style.background='#1a6b3a';eb.onclick=confirmAndSend;}
     if(!document.getElementById('sign-banner')){
       const b=document.createElement('div');b.id='sign-banner';
       b.style.cssText='background:#1a6b3a;color:#fff;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:10px;direction:rtl;text-align:center;line-height:1.5';
-      b.innerHTML='✍ מצב חתימה<br><span style="font-size:11px;opacity:.85">חתום על הטופס ואז לחץ "ייצא PDF"</span>';
+      b.innerHTML='✍ מצב חתימה<br><span style="font-size:11px;opacity:.85">חתום ואז לחץ "אשר ושלח PDF"</span>';
       const fp=document.querySelector('.fp');if(fp)fp.prepend(b);
     }
   }catch(e){console.error('decodeState:',e);}
@@ -603,6 +607,40 @@ function shareViaWhatsApp(){
   const url=location.href.split('#')[0]+'#s='+enc;
   const msg='שלום,\nנשלח אליך טופס לחתימה דיגיטלית.\nלחץ על הקישור הבא וחתום:\n'+url;
   window.open('https://api.whatsapp.com/send?text='+encodeURIComponent(msg),'_blank');
+}
+async function confirmAndSend(){
+  const sigEl=$('ov-sig-p');
+  if(!sigEl||!sigEl.querySelector('img')){showStat('sig-stat','יש לחתום תחילה','err');return;}
+  showStat('sig-stat','מייצר PDF...','');
+  try{
+    const pp=document.querySelector('.pp');
+    const fp=$('form-preview');
+    const savedZoom=fp.style.zoom;
+    const ppHidden=getComputedStyle(pp).display==='none';
+    if(ppHidden){pp.style.position='fixed';pp.style.top='-9999px';pp.style.left='0';pp.style.display='block';}
+    fp.style.zoom='';
+    await new Promise(r=>setTimeout(r,80));
+    const canvas=await html2canvas(fp,{scale:2,useCORS:true,allowTaint:true,backgroundColor:'#fff',width:794,height:1123,scrollX:0,scrollY:0});
+    fp.style.zoom=savedZoom;
+    if(ppHidden){pp.style.position='';pp.style.top='';pp.style.left='';pp.style.display='';}
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+    pdf.addImage(canvas.toDataURL('image/jpeg',0.97),'JPEG',0,0,210,297);
+    const pdfBlob=pdf.output('blob');
+    const file=new File([pdfBlob],'טופס-254-חתום.pdf',{type:'application/pdf'});
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({title:'טופס 254 חתום',files:[file]});
+      showStat('sig-stat','הקובץ נשלח ✓','ok');
+      return;
+    }
+    const burl=URL.createObjectURL(pdfBlob);
+    const a=document.createElement('a');a.href=burl;a.download='טופס-254-חתום.pdf';a.click();
+    setTimeout(()=>{
+      URL.revokeObjectURL(burl);
+      window.open('https://wa.me/972522499887?text='+encodeURIComponent('שלום עו"ד ערן, חתמתי על טופס 254. מצרף קובץ PDF חתום.'),'_blank');
+      showStat('sig-stat','PDF הורד — שלח אותו בוואטסאפ ✓','ok');
+    },1200);
+  }catch(e){showStat('sig-stat','שגיאה: '+e.message,'err');}
 }
 function shareSig(){
   const enc=encodeState();
